@@ -34,7 +34,6 @@ func main() {
 		err           error
 		ctx, cancelFn = context.WithCancel(context.Background())
 	)
-	defer cancelFn()
 
 	if err = Init(); err != nil {
 		log.Fatalf("init failed: %v", err)
@@ -75,12 +74,15 @@ func main() {
 	if err = mEngine.Start(ctx); err != nil {
 		log.Fatalf("Start failed : %v", err)
 	}
-	defer mEngine.Close()
 
 	// ------------- 监听杀死 -------------
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+
+	// --------------执行退出-----------------
+	cancelFn()
+	mEngine.Close()
 
 	// ------------- 程序结束 -------------
 	log.Print("app exit ...")

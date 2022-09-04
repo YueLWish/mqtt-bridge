@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/YueLWish/mqtt-bridge/pkg/xmqtt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/panjf2000/ants"
 	"github.com/pkg/errors"
 	"log"
 )
@@ -44,11 +45,15 @@ func (e *Engine) Dial() error {
 }
 
 func (e *Engine) handlerMessage(ctx context.Context) {
+	gPool, _ := ants.NewPool(ants.DEFAULT_ANTS_POOL_SIZE)
+	defer gPool.Release()
+
 	for msg := range e.MessageChan {
 		select {
 		case <-ctx.Done():
 			break
 		default:
+
 			filter, err := e.filterTree.MathFilter(msg.Topic)
 			if err != nil {
 				log.Printf("math topic failed: %v", err)
@@ -74,14 +79,17 @@ func (e *Engine) handlerMessage(ctx context.Context) {
 					continue
 				}
 
-				err := xmqtt.Send(client, msg.Topic, msg.Payload)
-				if err != nil {
-					log.Printf("[send message] -- %s ==> %v t:%s failed: %v", msg.FromTag, tTag, msg.Topic, err)
-				} else {
-					log.Printf("[send message] -- %s ==> %v t:%s p:%s", msg.FromTag, tTag, msg.Topic, msg.Payload)
+				if err = gPool.Submit(func() {
+					err := xmqtt.Send(client, msg.Topic, msg.Payload)
+					if err != nil {
+						log.Printf("[send message] -- %s ==> %v t:%s failed: %v", msg.FromTag, tTag, msg.Topic, err)
+					} else {
+						log.Printf("[send message] -- %s ==> %v t:%s p:%s", msg.FromTag, tTag, msg.Topic, msg.Payload)
+					}
+				}); err != nil {
+					log.Printf("[submit message] failed: %v", err)
 				}
 			}
-
 		}
 	}
 }
@@ -89,6 +97,9 @@ func (e *Engine) handlerMessage(ctx context.Context) {
 func (e *Engine) Start(ctx context.Context) error {
 	// 接收并处理数据
 	go e.handlerMessage(ctx)
+
+	mcCap := cap(e.MessageChan)
+	notifyV := int(float32(mcCap) * 0.75)
 
 	// 开始订阅
 	for tag, client := range e.cliConnMap {
@@ -113,7 +124,16 @@ func (e *Engine) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			default:
-				e.MessageChan <- &m
+				mcSize := len(e.MessageChan)
+				if mcSize > notifyV {
+					log.Printf("[channel message] current channel size: %d", mcSize)
+				}
+
+				if mcSize < mcCap {
+					e.MessageChan <- &m
+				} else {
+					log.Printf("[skip message] message channel amass; size=%d", len(e.MessageChan))
+				}
 			}
 		})
 	}
