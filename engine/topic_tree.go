@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"github.com/YueLWish/mqtt-bridge/pkg/kit"
 	"github.com/pkg/errors"
+	"github.com/yuelwish/mqtt-bridge/pkg/kit"
 	"strings"
 )
 
@@ -13,7 +13,7 @@ type TopicFilterTree struct {
 func (t *TopicFilterTree) AddFilter(topics ...string) *TopicFilterTree {
 	for _, topic := range topics {
 		pNode := t.root
-		for _, s := range kit.SplitParticiple(topic) {
+		for _, s := range kit.SplitTopic(topic) {
 			v, ok := pNode[s]
 			if !ok {
 				v = &Node{Value: s, Child: make(map[string]*Node, 3)}
@@ -26,20 +26,21 @@ func (t *TopicFilterTree) AddFilter(topics ...string) *TopicFilterTree {
 }
 
 func (t *TopicFilterTree) MathFilter(topic string) (string, error) {
-	tSubset := kit.SplitParticiple(topic)
-	kSubset := make([]string, 0, len(tSubset))
+	tSubset := kit.SplitTopic(topic)
+	//kSubset := make([]string, 0, len(tSubset))
+	var kSb strings.Builder
 
 	pNode := t.root
 	for _, s := range tSubset {
 
 		if cNode, ok := pNode["#"]; ok {
-			kSubset = append(kSubset, cNode.Value)
+			kSb.WriteString(cNode.Value)
 			pNode = cNode.Child
 			break
 		}
 
 		if cNode, ok := pNode["+"]; ok {
-			kSubset = append(kSubset, cNode.Value)
+			kSb.WriteString(cNode.Value)
 			pNode = cNode.Child
 			continue
 		}
@@ -50,7 +51,7 @@ func (t *TopicFilterTree) MathFilter(topic string) (string, error) {
 		}
 
 		if cNode.Value == s {
-			kSubset = append(kSubset, cNode.Value)
+			kSb.WriteString(cNode.Value)
 			pNode = cNode.Child
 			continue
 		}
@@ -58,12 +59,11 @@ func (t *TopicFilterTree) MathFilter(topic string) (string, error) {
 		break // 无法匹配
 	}
 
-	if len(kSubset) == 0 {
+	if kSb.Len() == 0 {
 		return "", errors.Errorf("Failed to match.")
 	}
 
-	v := strings.Join(kSubset, "/")
-	return strings.Replace(v, "//", "/", -1), nil
+	return kSb.String(), nil
 }
 
 func NewTopicFilterTree() *TopicFilterTree {

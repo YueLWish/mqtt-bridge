@@ -2,25 +2,29 @@ package kit
 
 import "strings"
 
-// SplitParticiple 把 topic 分词成为 数组
-// topic 特殊保留 / 开头和 / 结尾
-func SplitParticiple(s string) []string {
+// SplitTopic 把 topic 按 "/" 分割为数组, 数组中保留 "/"
+func SplitTopic(s string) []string {
 
-	data := make([]string, 0, 7)
+	seq := '/'
+	var (
+		sb strings.Builder
+		a  = make([]string, 0, 7)
+	)
 
-	if strings.HasPrefix(s, "/") {
-		data = append(data, "/")
+	for _, c := range []rune(s) {
+		if c == seq {
+			if sb.Len() > 0 {
+				a = append(a, sb.String())
+				sb.Reset()
+			}
+			a = append(a, string(seq))
+			continue
+		}
+		sb.WriteRune(c)
 	}
-
-	_data := strings.FieldsFunc(s, func(r rune) bool {
-		return r == '/'
-	})
-
-	data = append(data, _data...)
-
-	if strings.HasSuffix(s, "/") {
-		data = append(data, "/")
+	if sb.Len() > 0 {
+		a = append(a, sb.String())
+		sb.Reset()
 	}
-
-	return data
+	return a
 }
