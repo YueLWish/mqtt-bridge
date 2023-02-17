@@ -82,7 +82,7 @@ func (e *EngineHelper) BuildEngine() (*Engine, error) {
 			for _, tTag := range topicTags {
 				topicFilter, ok := e.filterMap[tTag]
 				if !ok {
-					return nil, errors.Errorf("")
+					return nil, errors.Errorf("routing topics not found tag %s", tTag)
 				}
 
 				filters := make([]*SubTopic, 0, len(topicFilter.Filter))
