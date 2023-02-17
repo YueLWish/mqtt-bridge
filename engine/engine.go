@@ -2,10 +2,10 @@ package engine
 
 import (
 	"context"
-	"github.com/YueLWish/mqtt-bridge/pkg/xmqtt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/panjf2000/ants"
 	"github.com/pkg/errors"
+	"github.com/yuelwish/mqtt-bridge/pkg/xmqtt"
 	"log"
 )
 
@@ -82,9 +82,9 @@ func (e *Engine) handlerMessage(ctx context.Context) {
 				if err = gPool.Submit(func() {
 					err := xmqtt.Send(client, msg.Topic, msg.Payload)
 					if err != nil {
-						log.Printf("[send message] -- %s ==> %v t:%s failed: %v", msg.FromTag, tTag, msg.Topic, err)
+						log.Printf("[send message] %s ==> %v t:%s failed: %v", msg.FromTag, tTag, msg.Topic, err)
 					} else {
-						log.Printf("[send message] -- %s ==> %v t:%s p:%s", msg.FromTag, tTag, msg.Topic, msg.Payload)
+						log.Printf("[send message] %s ==> %v t:%s p:%s", msg.FromTag, tTag, msg.Topic, msg.Payload)
 					}
 				}); err != nil {
 					log.Printf("[submit message] failed: %v", err)

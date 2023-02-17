@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/YueLWish/mqtt-bridge/engine"
-	"github.com/YueLWish/mqtt-bridge/pkg/setting"
 	"github.com/pkg/errors"
+	"github.com/yuelwish/mqtt-bridge/engine"
+	"github.com/yuelwish/mqtt-bridge/pkg/setting"
 	"log"
 	"os"
 	"os/signal"

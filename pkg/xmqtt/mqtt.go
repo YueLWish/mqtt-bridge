@@ -17,7 +17,8 @@ func Init(clientIdPrefix, addr string, optFns ...func(opt *mqtt.ClientOptions)) 
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(addr)
 	opts.SetClientID(clientIdPrefix + "-" + strconv.FormatInt(time.Now().UnixNano(), 36))
-	opts.SetKeepAlive(time.Second * time.Duration(10))
+	opts.SetKeepAlive(10 * time.Second)
+	opts.SetMaxReconnectInterval(10 * time.Second)
 
 	opts.SetOnConnectHandler(func(client mqtt.Client) {
 		r := client.OptionsReader()
@@ -51,12 +52,12 @@ func Init(clientIdPrefix, addr string, optFns ...func(opt *mqtt.ClientOptions)) 
 		fn(opts)
 	}
 
-	client := mqtt.NewClient(opts)
+	client := NewClient(opts)
 
-	token := client.Connect()
-	if token.WaitTimeout(timeoutDuration) && token.Error() != nil {
+	if token := client.Connect(); token.WaitTimeout(timeoutDuration) && token.Error() != nil {
 		return nil, token.Error()
 	}
+
 	return client, nil
 }
 
