@@ -17,7 +17,8 @@ func Init(clientIdPrefix, addr string, optFns ...func(opt *mqtt.ClientOptions)) 
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(addr)
 	opts.SetClientID(clientIdPrefix + "-" + strconv.FormatInt(time.Now().UnixNano(), 36))
-	opts.SetKeepAlive(10 * time.Second)
+	opts.SetKeepAlive(60 * time.Second)
+	opts.SetPingTimeout(5 * time.Second)
 	opts.SetMaxReconnectInterval(10 * time.Second)
 
 	opts.SetOnConnectHandler(func(client mqtt.Client) {
@@ -69,8 +70,8 @@ func UnSubscribe(client mqtt.Client, topic ...string) error {
 	return nil
 }
 
-func Send(client mqtt.Client, topic string, payload []byte) error {
-	token := client.Publish(topic, 1, false, payload)
+func Send(client mqtt.Client, topic string, qos byte, retained bool, payload []byte) error {
+	token := client.Publish(topic, qos, retained, payload)
 	if token.Wait() && token.Error() != nil {
 		return token.Error()
 	}

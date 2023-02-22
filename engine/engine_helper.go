@@ -142,6 +142,6 @@ func (e *EngineHelper) BuildEngine() (*Engine, error) {
 		cliSubMap:   cliSubMap,
 		filterTree:  filterTree,
 		toTopicMap:  toTopicMap,
-		MessageChan: make(chan *Message, 4096),
+		MessageChan: make(chan *Message, 1024),
 	}, nil
 }

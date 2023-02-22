@@ -3,10 +3,11 @@ package engine
 import (
 	"context"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/panjf2000/ants"
+	"github.com/panjf2000/ants/v2"
 	"github.com/pkg/errors"
 	"github.com/yuelwish/mqtt-bridge/pkg/xmqtt"
 	"log"
+	"runtime"
 )
 
 const (
@@ -45,7 +46,7 @@ func (e *Engine) Dial() error {
 }
 
 func (e *Engine) handlerMessage(ctx context.Context) {
-	gPool, _ := ants.NewPool(ants.DEFAULT_ANTS_POOL_SIZE)
+	gPool, _ := ants.NewPool(runtime.NumCPU() * 10)
 	defer gPool.Release()
 
 	for msg := range e.MessageChan {
@@ -80,7 +81,7 @@ func (e *Engine) handlerMessage(ctx context.Context) {
 				}
 
 				if err = gPool.Submit(func() {
-					err := xmqtt.Send(client, msg.Topic, msg.Payload)
+					err := xmqtt.Send(client, msg.Topic, 0, false, msg.Payload)
 					if err != nil {
 						log.Printf("[send message] %s ==> %v t:%s failed: %v", msg.FromTag, tTag, msg.Topic, err)
 					} else {
