@@ -1,0 +1,74 @@
+version: '3'
+# go install github.com/go-task/task/v3/cmd/task@latest
+# 并且将 $GOPATH/bin 配置到环境变量，能使用 task 命令
+# 通过  task -a 查看当前所有任务
+# 通过 task {taskName} 来执行任务
+
+vars:
+  appName: "mqtt-bridge"
+  appFullName: '{{.appName}}{{exeExt}}'
+  srcDir: './cmd/mqtt_bridge/'
+  outDir: './bin'
+
+
+tasks:
+  generate:
+    aliases: [ gen ]
+    cmd: wire ./...
+
+  default:
+    desc: Build and run the web app
+    aliases: [ run ]
+    cmds:
+      - task: build
+      - ./bin/{{.appFullName}}
+
+  build:
+    desc: "编译当前平台的可执行文件"
+    env:
+      CGO_ENABLED: 0
+    cmds:
+      - go build -buildvcs=false -ldflags '-w -s' -trimpath -o {{.outDir}}/{{.appFullName}} {{.srcDir}}
+
+  build-all:
+    desc: "编译Mac、Linux、Windows平台的可执行文件"
+    deps:
+      - build-win
+      - build-linux
+      - build-mac
+
+  build-win:
+    desc: "编译Windows平台的可执行文件"
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: 0
+    cmds:
+      - go build -buildvcs=false -ldflags '-w -s' -trimpath -o {{.outDir}}/{{.appName}}-win.exe {{.srcDir}}
+
+  build-linux:
+    desc: "编译Linux平台的可执行文件"
+    env:
+      GOOS: linux
+      GOARCH: amd64
+      CGO_ENABLED: 0
+    cmds:
+      - go build -buildvcs=false -ldflags '-w -s' -trimpath -o {{.outDir}}/{{.appName}}-linux {{.srcDir}}
+
+  build-mac:
+    desc: "编译Mac平台的可执行文件"
+    env:
+      GOOS: darwin
+      GOARCH: amd64
+      CGO_ENABLED: 0
+    cmds:
+      - go build -buildvcs=false -ldflags '-w -s' -trimpath -o {{.outDir}}/{{.appName}}-darwin.mac {{.srcDir}}
+
+  clean:
+    desc: "清理编译目录"
+    cmds:
+      - cmd: rm -rf {{.outDir}}/
+        platforms: [ linux, darwin ]
+      - cmd: rmdir /s/q {{.outDir}}/
+        platforms: [ windows ]
+

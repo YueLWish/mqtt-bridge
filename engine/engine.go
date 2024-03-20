@@ -54,7 +54,6 @@ func (e *Engine) handlerMessage(ctx context.Context) {
 		case <-ctx.Done():
 			break
 		default:
-
 			filter, err := e.filterTree.MathFilter(msg.Topic)
 			if err != nil {
 				log.Printf("math topic failed: %v", err)
@@ -81,12 +80,7 @@ func (e *Engine) handlerMessage(ctx context.Context) {
 				}
 
 				if err = gPool.Submit(func() {
-					err := xmqtt.Send(client, msg.Topic, 0, false, msg.Payload)
-					if err != nil {
-						log.Printf("[send message] %s ==> %v t:%s failed: %v", msg.FromTag, tTag, msg.Topic, err)
-					} else {
-						log.Printf("[send message] %s ==> %v t:%s p:%s", msg.FromTag, tTag, msg.Topic, msg.Payload)
-					}
+					xmqtt.FastSend(client, msg.Topic, msg.Qos, false, msg.Payload)
 				}); err != nil {
 					log.Printf("[submit message] failed: %v", err)
 				}
@@ -116,9 +110,11 @@ func (e *Engine) Start(ctx context.Context) error {
 		_tag := tag
 		client.SubscribeMultiple(filters, func(client mqtt.Client, message mqtt.Message) {
 			m := Message{
-				FromTag: _tag,
-				Topic:   message.Topic(),
-				Payload: message.Payload(),
+				FromTag:  _tag,
+				Topic:    message.Topic(),
+				Payload:  message.Payload(),
+				Qos:      message.Qos(),
+				Retained: message.Retained(),
 			}
 
 			select {

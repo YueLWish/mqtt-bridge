@@ -5,6 +5,7 @@ import (
 	"flag"
 	"github.com/pkg/errors"
 	"github.com/yuelwish/mqtt-bridge/engine"
+	"github.com/yuelwish/mqtt-bridge/pkg/logger"
 	"github.com/yuelwish/mqtt-bridge/pkg/setting"
 	"log"
 	"os"
@@ -19,7 +20,6 @@ func init() {
 
 	flag.StringVar(&conPath, "conf", "config.json", "配置文件路径 支持[josn,toml,yaml]")
 	flag.Parse()
-
 }
 
 func Init() error {
@@ -38,6 +38,13 @@ func main() {
 	if err = Init(); err != nil {
 		log.Fatalf("init failed: %v", err)
 	}
+
+	_, syncFn, err := logger.NewLogger(setting.AppConf)
+	if err != nil {
+		log.Fatalf("new logger failed: %v", err)
+	}
+	defer syncFn()
+
 	// 1. 初始化 all client
 	// 2. 根据路由 整理出 每个 client 需要监听的 topic 和 生成 topic 匹配树
 	// 3. 让 client 开始监听对应的 topic
@@ -81,8 +88,8 @@ func main() {
 	<-quit
 
 	// --------------执行退出-----------------
-	cancelFn()
 	mEngine.Close()
+	cancelFn()
 
 	// ------------- 程序结束 -------------
 	log.Print("app exit ...")

@@ -6,25 +6,36 @@ import (
 )
 
 type AppConfig struct {
-	Clients []ClientConfig  `json:"clients"`
-	Topics  []TopicConfig   `json:"topics"`
-	Routing []RoutingConfig `json:"routing"`
+	Clients []ClientConfig  `mapstructure:"clients"`
+	Topics  []TopicConfig   `mapstructure:"topics"`
+	Routing []RoutingConfig `mapstructure:"routing"`
+	Log     Log             `mapstructure:"log"`
 }
 type ClientConfig struct {
-	Tag      string `json:"tag"`
-	Address  string `json:"address"`
-	UserName string `json:"userName"`
-	Password string `json:"password"`
+	Tag      string `mapstructure:"tag"`
+	Address  string `mapstructure:"address"`
+	UserName string `mapstructure:"userName"`
+	Password string `mapstructure:"password"`
 }
 type TopicConfig struct {
-	Tag    string   `json:"tag"`
-	Qos    byte     `json:"qos"`
-	Filter []string `json:"filter"`
+	Tag    string   `mapstructure:"tag"`
+	Qos    byte     `mapstructure:"qos"`
+	Filter []string `mapstructure:"filter"`
 }
 type RoutingConfig struct {
-	FromTags  []string `json:"fromTags"`
-	ToTags    []string `json:"toTags"`
-	TopicTags []string `json:"topicTags"`
+	FromTags  []string `mapstructure:"fromTags"`
+	ToTags    []string `mapstructure:"toTags"`
+	TopicTags []string `mapstructure:"topicTags"`
+}
+
+type Log struct {
+	Level      string `mapstructure:"level"`
+	Console    bool   `mapstructure:"console"`
+	Encoder    string `mapstructure:"encoder"`
+	FileName   string `mapstructure:"fileName"`
+	MaxSize    int    `mapstructure:"maxSize"`
+	MaxAge     int    `mapstructure:"maxAge"`
+	MaxBackups int    `mapstructure:"maxBackups"`
 }
 
 var AppConf = &AppConfig{}

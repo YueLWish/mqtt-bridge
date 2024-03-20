@@ -6,12 +6,12 @@ import (
 
 func TestTopicFilterTreeV1(t *testing.T) {
 	tfTree := NewTopicFilterTree()
-	tfTree.AddFilter("/abc/#")
+	tfTree.AddFilter("g2s/+/+/pv/#")
 
 	topicMap := map[string]bool{
-		"/abc/123":  true,
-		"//abc/123": false,
-		"abc/#":     false,
+		"g2s/a003/state/report": true,
+		"//abc/123":             false,
+		"abc/#":                 false,
 	}
 
 	for topic, want := range topicMap {

@@ -29,7 +29,9 @@ type Node struct {
 }
 
 type Message struct {
-	FromTag string
-	Topic   string
-	Payload []byte
+	FromTag  string
+	Topic    string
+	Payload  []byte
+	Qos      byte
+	Retained bool
 }
