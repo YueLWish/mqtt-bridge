@@ -1,7 +1,8 @@
 package xmqtt
 
 import (
-	"log"
+	"github.com/yuelwish/mqtt-bridge/pkg/logger"
+	"go.uber.org/zap"
 	"strconv"
 	"strings"
 	"time"
@@ -39,7 +40,7 @@ func Init(clientIdPrefix, addr string, optFns ...func(opt *mqtt.ClientOptions)) 
 		}
 		hostLink := strings.Join(hosts, ", ")
 
-		log.Printf("[CONN successful] -- %s conn %s", cId, hostLink)
+		logger.Debug("[CONN successful]", zap.String("client_id", cId), zap.String("host_link", hostLink))
 	})
 
 	opts.SetConnectionLostHandler(func(client mqtt.Client, err error) {
@@ -52,8 +53,7 @@ func Init(clientIdPrefix, addr string, optFns ...func(opt *mqtt.ClientOptions)) 
 			hosts[i] = url.Host
 		}
 		hostLink := strings.Join(hosts, ", ")
-
-		log.Printf("[CONN ERROR] -- %s conn %s %v", cId, hostLink, err)
+		logger.Debug("[CONN ERROR]", zap.String("client_id", cId), zap.String("host_link", hostLink), zap.Error(err))
 	})
 
 	for _, fn := range optFns {
@@ -69,6 +69,9 @@ func Init(clientIdPrefix, addr string, optFns ...func(opt *mqtt.ClientOptions)) 
 	return client, nil
 }
 
+func MustUnSubscribe(client mqtt.Client, topic ...string) {
+	_ = client.Unsubscribe(topic...)
+}
 func UnSubscribe(client mqtt.Client, topic ...string) error {
 	token := client.Unsubscribe(topic...)
 	if token.Wait() && token.Error() != nil {
@@ -77,11 +80,11 @@ func UnSubscribe(client mqtt.Client, topic ...string) error {
 	return nil
 }
 
-func FastSend(client mqtt.Client, topic string, qos byte, retained bool, payload []byte) {
+func MustPublish(client mqtt.Client, topic string, qos byte, retained bool, payload []byte) {
 	_ = client.Publish(topic, qos, retained, payload)
 }
 
-func Send(client mqtt.Client, topic string, qos byte, retained bool, payload []byte) error {
+func Publish(client mqtt.Client, topic string, qos byte, retained bool, payload []byte) error {
 	token := client.Publish(topic, qos, retained, payload)
 	if token.Wait() && token.Error() != nil {
 		return token.Error()
@@ -89,6 +92,9 @@ func Send(client mqtt.Client, topic string, qos byte, retained bool, payload []b
 	return nil
 }
 
+func MustSubscribe(client mqtt.Client, topic string, qos byte, callback mqtt.MessageHandler) {
+	_ = client.Subscribe(topic, qos, callback)
+}
 func Subscribe(client mqtt.Client, topic string, qos byte, callback mqtt.MessageHandler) error {
 	token := client.Subscribe(topic, qos, callback)
 	if token.Wait() && token.Error() != nil {
@@ -97,6 +103,14 @@ func Subscribe(client mqtt.Client, topic string, qos byte, callback mqtt.Message
 	return nil
 }
 
+func MustSubscribes(client mqtt.Client, topics []string, qos byte, callback mqtt.MessageHandler) {
+	filters := make(map[string]byte, len(topics))
+	for _, topic := range topics {
+		filters[topic] = qos // topic:qos
+	}
+
+	_ = client.SubscribeMultiple(filters, callback)
+}
 func Subscribes(client mqtt.Client, topics []string, qos byte, callback mqtt.MessageHandler) error {
 	filters := make(map[string]byte, len(topics))
 	for _, topic := range topics {

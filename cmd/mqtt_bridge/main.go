@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/pkg/errors"
+	"github.com/yuelwish/mqtt-bridge/pkg/errors"
+
 	"github.com/yuelwish/mqtt-bridge/engine"
 	"github.com/yuelwish/mqtt-bridge/pkg/logger"
 	"github.com/yuelwish/mqtt-bridge/pkg/setting"
-	"log"
+	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,15 +17,13 @@ import (
 var conPath string
 
 func init() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
 	flag.StringVar(&conPath, "conf", "config.json", "配置文件路径 支持[josn,toml,yaml]")
 	flag.Parse()
 }
 
 func Init() error {
 	if err := setting.Steup(conPath); err != nil {
-		return errors.Wrap(err, "配置文件存在错误")
+		return errors.WithMessage(err, "配置文件存在错误")
 	}
 	return nil
 }
@@ -36,12 +35,12 @@ func main() {
 	)
 
 	if err = Init(); err != nil {
-		log.Fatalf("init failed: %v", err)
+		logger.Fatal("init failed", zap.Error(err))
 	}
 
 	_, syncFn, err := logger.NewLogger(setting.AppConf)
 	if err != nil {
-		log.Fatalf("new logger failed: %v", err)
+		logger.Fatal("new logger failed", zap.Error(err))
 	}
 	defer syncFn()
 
@@ -56,13 +55,13 @@ func main() {
 			addr.UserName = it.UserName
 			addr.Password = it.Password
 		}); err != nil {
-			log.Printf("add client failed : %v", err)
+			logger.Warn("add client failed", zap.Error(err))
 		}
 	}
 
 	for _, it := range setting.AppConf.Topics {
 		if err = eHelper.AddTopicFilter(it.Tag, it.Qos, it.Filter...); err != nil {
-			log.Printf("add client topic filter : %v", err)
+			logger.Warn("add client topic filter failed ", zap.Error(err))
 		}
 	}
 
@@ -72,14 +71,14 @@ func main() {
 
 	mEngine, err := eHelper.BuildEngine()
 	if err != nil {
-		log.Fatalf("BuildEngine failed : %v", err)
+		logger.Fatal("BuildEngine failed", zap.Error(err))
 	}
 	if err = mEngine.Dial(); err != nil {
-		log.Fatalf("Dial failed : %v", err)
+		logger.Fatal("Dial failed", zap.Error(err))
 	}
 
 	if err = mEngine.Start(ctx); err != nil {
-		log.Fatalf("Start failed : %v", err)
+		logger.Fatal("Start failed", zap.Error(err))
 	}
 
 	// ------------- 监听杀死 -------------
@@ -92,5 +91,5 @@ func main() {
 	cancelFn()
 
 	// ------------- 程序结束 -------------
-	log.Print("app exit ...")
+	logger.Info("app exit ...")
 }

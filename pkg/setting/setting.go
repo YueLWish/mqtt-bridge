@@ -1,8 +1,8 @@
 package setting
 
 import (
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"log"
 )
 
 type AppConfig struct {
@@ -46,13 +46,11 @@ func Steup(configFile string) error {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		log.Printf("viper.ReadInConfig() failed: %v", err)
-		return err
+		return errors.Wrapf(err, "viper.ReadInConfig() failed: %v", err)
 	}
 	err = viper.Unmarshal(AppConf)
 	if err != nil {
-		log.Printf("viper.Unmarshal() failed: %v", err)
-		return err
+		return errors.Wrapf(err, "viper.Unmarshal() failed: %v", err)
 	}
 	return nil
 }

@@ -5,8 +5,10 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/panjf2000/ants/v2"
 	"github.com/pkg/errors"
+	"github.com/yuelwish/mqtt-bridge/pkg/kit"
+	"github.com/yuelwish/mqtt-bridge/pkg/logger"
 	"github.com/yuelwish/mqtt-bridge/pkg/xmqtt"
-	"log"
+	"go.uber.org/zap"
 	"runtime"
 )
 
@@ -15,10 +17,11 @@ const (
 )
 
 type Engine struct {
-	cliAddrMap map[string]*MqttAddress // clientTag : client address
-	cliSubMap  map[string][]*SubTopic  // clientTag : 对应订阅的 topicFilter
-	filterTree *TopicFilterTree        // filter 按 / 分割生成树形结构
-	toTopicMap map[string][]string     // fromTag+topicFilter : toTags
+	cliAddrMap         map[string]*MqttAddress // clientTag : client address
+	cliSubMap          map[string][]*SubTopic  // clientTag : 对应订阅的 topicFilter
+	filterTree         *TopicFilterTree        // filter 按 / 分割生成树形结构
+	toTopicMap         map[string][]string     // fromTag+topicFilter : toTags
+	routingFilterTable map[string]string       // 路由中的 filter 映射 tag
 
 	MessageChan chan *Message          // 处理MQTT消息的队列
 	cliConnMap  map[string]mqtt.Client // clientTag : mqtt.client
@@ -50,20 +53,21 @@ func (e *Engine) handlerMessage(ctx context.Context) {
 	defer gPool.Release()
 
 	for msg := range e.MessageChan {
+		sCtxt := msg.ctx
 		select {
 		case <-ctx.Done():
 			break
 		default:
 			filter, err := e.filterTree.MathFilter(msg.Topic)
 			if err != nil {
-				log.Printf("math topic failed: %v", err)
+				logger.WithContext(sCtxt).Info("math topic failed", zap.Error(err))
 				continue
 			}
 
 			key := msg.FromTag + "-" + filter
 			tTags, ok := e.toTopicMap[key]
 			if !ok {
-				log.Printf("[match toTags] not match -- fTag=%v, filter=%v", msg.FromTag, filter)
+				logger.WithContext(ctx).Info("[match toTags] not match", zap.String("fTag", msg.FromTag), zap.String("filter", filter))
 				continue
 			}
 
@@ -75,14 +79,21 @@ func (e *Engine) handlerMessage(ctx context.Context) {
 
 				client, ok := e.cliConnMap[tTag]
 				if !ok {
-					log.Printf("[match toTags] not match client conn: key=%s", tTags)
+					logger.WithContext(ctx).Info("[match toTags] not match client conn", zap.String("tTag", tTag))
 					continue
 				}
 
 				if err = gPool.Submit(func() {
-					xmqtt.FastSend(client, msg.Topic, msg.Qos, false, msg.Payload)
+					logger.WithContext(ctx).Debug("relay the message",
+						zap.String("routTag", e.routingFilterTable[filter]),
+						zap.String("fromTag", msg.FromTag),
+						zap.String("toTag", tTag),
+						zap.String("topic", msg.Topic),
+						zap.ByteString("payload", msg.Payload),
+					)
+					xmqtt.MustPublish(client, msg.Topic, msg.Qos, msg.Retained, msg.Payload)
 				}); err != nil {
-					log.Printf("[submit message] failed: %v", err)
+					logger.WithContext(ctx).Error("[submit message] failed", zap.Error(err))
 				}
 			}
 		}
@@ -105,11 +116,16 @@ func (e *Engine) Start(ctx context.Context) error {
 		filters := make(map[string]byte, len(v))
 		for _, sub := range v {
 			filters[sub.Topic] = sub.Qos
-			log.Printf("[subscribe] %v :: %v", tag, sub.Topic)
+			logger.Info("[subscribe]", zap.String("clientTag", tag), zap.String("topic", sub.Topic))
 		}
 		_tag := tag
 		client.SubscribeMultiple(filters, func(client mqtt.Client, message mqtt.Message) {
+			sCtx, cancelFunc := context.WithCancel(ctx)
+			defer cancelFunc()
+			sCtx = e.newCtx(sCtx)
+
 			m := Message{
+				ctx:      sCtx,
 				FromTag:  _tag,
 				Topic:    message.Topic(),
 				Payload:  message.Payload(),
@@ -123,13 +139,13 @@ func (e *Engine) Start(ctx context.Context) error {
 			default:
 				mcSize := len(e.MessageChan)
 				if mcSize > notifyV {
-					log.Printf("[channel message] current channel size: %d", mcSize)
+					logger.WithContext(sCtx).Info("[channel message] current channel", zap.Int("size", mcSize))
 				}
 
 				if mcSize < mcCap {
 					e.MessageChan <- &m
 				} else {
-					log.Printf("[skip message] message channel amass; size=%d", len(e.MessageChan))
+					logger.WithContext(sCtx).Info("[skip message] message channel amass", zap.Int("size", len(e.MessageChan)))
 				}
 			}
 		})
@@ -152,9 +168,13 @@ func (e *Engine) Release() {
 
 		err := xmqtt.UnSubscribe(client, topics...)
 		if err != nil {
-			log.Printf("Unsubscribed clientTag: %v fialed %v", tag, err)
+			logger.Warn("Unsubscribed clientTag", zap.String("clientTag", tag), zap.Error(err))
 		}
 	}
+}
+
+func (e *Engine) newCtx(ctx context.Context) context.Context {
+	return logger.NewContext(ctx, zap.String("traceId", kit.NewTraceId()))
 }
 
 func (e *Engine) Close() {

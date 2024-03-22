@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"github.com/pkg/errors"
+	"github.com/yuelwish/mqtt-bridge/pkg/errors"
 )
 
 func NewEngineHelper() *EngineHelper {
@@ -21,9 +21,8 @@ type EngineHelper struct {
 func (e *EngineHelper) AddTopicFilter(tag string, qos byte, filter ...string) error {
 	v, ok := e.filterMap[tag]
 	if ok {
-		return errors.Errorf("already exists tag: %v", tag)
+		return errors.WithStack(errors.Errorf("already exists tag: %v", tag))
 	} else {
-
 		e.filterMap[tag] = v
 	}
 
@@ -39,7 +38,7 @@ type MqttOption func(*MqttAddress)
 
 func (m *EngineHelper) AddClient(tag string, address string, opts ...MqttOption) error {
 	if _, ok := m.cliAddrMap[tag]; ok {
-		return errors.Errorf("already exists tag: %v", tag)
+		return errors.WithStack(errors.Errorf("already exists tag: %v", tag))
 	}
 	var it = &MqttAddress{
 		Address: address,
@@ -82,7 +81,7 @@ func (e *EngineHelper) BuildEngine() (*Engine, error) {
 			for _, tTag := range topicTags {
 				topicFilter, ok := e.filterMap[tTag]
 				if !ok {
-					return nil, errors.Errorf("routing topics not found tag %s", tTag)
+					return nil, errors.WithStack(errors.Errorf("routing topics not found tag %s", tTag))
 				}
 
 				filters := make([]*SubTopic, 0, len(topicFilter.Filter))
@@ -104,12 +103,13 @@ func (e *EngineHelper) BuildEngine() (*Engine, error) {
 		for _, topicTag := range router.TopicTags { // 2. 循环路由 中 topicTag
 			tFilters, ok := e.filterMap[topicTag]
 			if !ok {
-				return nil, errors.Errorf("routing 未知的 topicTag %s", topicTag)
+				return nil, errors.WithStack(errors.Errorf("routing 未知的 topicTag %s", topicTag))
 			}
 			filterTree.AddFilter(tFilters.Filter...)
 		}
 	}
 
+	routingFilterTable := make(map[string]string, 7) // 路由中 topicTag 和 filter 的对应关系
 	// 构建 确定来源和filter 对应的 目标 tags
 	for _, router := range e.routers { // 1. 循环路由
 		var (
@@ -120,11 +120,12 @@ func (e *EngineHelper) BuildEngine() (*Engine, error) {
 		for _, topicTag := range topicTags { // 2. 循环路由中的 topicTag
 			topicFilter, ok := e.filterMap[topicTag]
 			if !ok {
-				return nil, errors.Errorf("routing 未知的 topicTag %s", topicTag)
+				return nil, errors.WithStack(errors.Errorf("routing 未知的 topicTag %s", topicTag))
 			}
 
 			for _, topic := range topicFilter.Filter { // 3. 循环 topicTag 中的 filter
-				for _, fTag := range fromTags { // 4. 为每一个fromTag 创建 key, 并把路由所有的 toTag 作为 Value
+				routingFilterTable[topic] = topicTag // 确定 topic 和 topicTag 的对应关系
+				for _, fTag := range fromTags {      // 4. 为每一个fromTag 创建 key, 并把路由所有的 toTag 作为 Value
 					key := fTag + "-" + topic
 					v, ok := toTopicMap[key]
 					if !ok {
@@ -138,10 +139,11 @@ func (e *EngineHelper) BuildEngine() (*Engine, error) {
 	}
 
 	return &Engine{
-		cliAddrMap:  e.cliAddrMap,
-		cliSubMap:   cliSubMap,
-		filterTree:  filterTree,
-		toTopicMap:  toTopicMap,
-		MessageChan: make(chan *Message, 1024),
+		cliAddrMap:         e.cliAddrMap,
+		cliSubMap:          cliSubMap,
+		filterTree:         filterTree,
+		toTopicMap:         toTopicMap,
+		routingFilterTable: routingFilterTable,
+		MessageChan:        make(chan *Message, 1024),
 	}, nil
 }

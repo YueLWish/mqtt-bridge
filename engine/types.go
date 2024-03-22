@@ -1,5 +1,7 @@
 package engine
 
+import "context"
+
 type MqttAddress struct {
 	Address  string
 	UserName string
@@ -29,6 +31,7 @@ type Node struct {
 }
 
 type Message struct {
+	ctx      context.Context
 	FromTag  string
 	Topic    string
 	Payload  []byte
