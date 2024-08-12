@@ -16,18 +16,14 @@ const (
 
 func Init(clientIdPrefix, addr string, optFns ...func(opt *mqtt.ClientOptions)) (mqtt.Client, error) {
 	opts := mqtt.NewClientOptions()
+
+	opts.SetCleanSession(false) // false 需要服务端保留发生信息
 	opts.AddBroker(addr)
 	opts.SetClientID(clientIdPrefix + "-" + strconv.FormatInt(time.Now().UnixNano(), 36))
-
-	opts.ConnectRetry = true
-	opts.ConnectTimeout = 10 * time.Second
-	opts.WriteTimeout = 15 * time.Second
-	opts.ResumeSubs = true
-	opts.Order = false
-
-	opts.KeepAlive = 15
-	opts.PingTimeout = 60 * time.Second
-	opts.MaxReconnectInterval = 30 * time.Second
+	opts.SetKeepAlive(30)
+	opts.SetPingTimeout(30)
+	opts.SetAutoReconnect(true)                    // 每30秒尝试重连
+	opts.SetMaxReconnectInterval(10 * time.Second) //启用自动重连功能
 
 	opts.SetOnConnectHandler(func(client mqtt.Client) {
 		r := client.OptionsReader()
@@ -73,10 +69,7 @@ func MustUnSubscribe(client mqtt.Client, topic ...string) {
 	_ = client.Unsubscribe(topic...)
 }
 func UnSubscribe(client mqtt.Client, topic ...string) error {
-	token := client.Unsubscribe(topic...)
-	if token.Wait() && token.Error() != nil {
-		return token.Error()
-	}
+	_ = client.Unsubscribe(topic...)
 	return nil
 }
 
@@ -85,10 +78,7 @@ func MustPublish(client mqtt.Client, topic string, qos byte, retained bool, payl
 }
 
 func Publish(client mqtt.Client, topic string, qos byte, retained bool, payload []byte) error {
-	token := client.Publish(topic, qos, retained, payload)
-	if token.Wait() && token.Error() != nil {
-		return token.Error()
-	}
+	_ = client.Publish(topic, qos, retained, payload)
 	return nil
 }
 
@@ -96,10 +86,7 @@ func MustSubscribe(client mqtt.Client, topic string, qos byte, callback mqtt.Mes
 	_ = client.Subscribe(topic, qos, callback)
 }
 func Subscribe(client mqtt.Client, topic string, qos byte, callback mqtt.MessageHandler) error {
-	token := client.Subscribe(topic, qos, callback)
-	if token.Wait() && token.Error() != nil {
-		return token.Error()
-	}
+	_ = client.Subscribe(topic, qos, callback)
 	return nil
 }
 
@@ -117,10 +104,7 @@ func Subscribes(client mqtt.Client, topics []string, qos byte, callback mqtt.Mes
 		filters[topic] = qos // topic:qos
 	}
 
-	token := client.SubscribeMultiple(filters, callback)
-	if token.Wait() && token.Error() != nil {
-		return token.Error()
-	}
+	_ = client.SubscribeMultiple(filters, callback)
 	return nil
 }
 
